@@ -1,0 +1,472 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "name": "TFQ_Example_BasicQAOA.ipynb",
+      "provenance": [],
+      "collapsed_sections": []
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "kKeM2IR1dGN0",
+        "colab_type": "text"
+      },
+      "source": [
+        "##### Copyright 2020 The TensorFlow Quantum Authors."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "ZQGwm207awkt",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "#@title Licensed under the Apache License, Version 2.0 (the \"License\");\n",
+        "# you may not use this file except in compliance with the License.\n",
+        "# You may obtain a copy of the License at\n",
+        "#\n",
+        "# https://www.apache.org/licenses/LICENSE-2.0\n",
+        "#\n",
+        "# Unless required by applicable law or agreed to in writing, software\n",
+        "# distributed under the License is distributed on an \"AS IS\" BASIS,\n",
+        "# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n",
+        "# See the License for the specific language governing permissions and\n",
+        "# limitations under the License."
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "Z91w8WrIeYQX",
+        "colab_type": "text"
+      },
+      "source": [
+        "# MaxCut QAOA\n",
+        "\n",
+        "Authors : Michael Streif, David Von Dollen\n",
+        "\n",
+        "Contributors : Michael Broughton\n",
+        "\n",
+        "Created : 2019\n",
+        "\n",
+        "Last updated : 2020-Mar-05"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "NO5t8JWLeaqO",
+        "colab_type": "text"
+      },
+      "source": [
+        "[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tensorflow/quantum/blob/research/qaoa/qaoa.ipynb)"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "7mlhXBELak9p",
+        "colab_type": "text"
+      },
+      "source": [
+        "This notebook shows an example of how to optimize variational parameters for QAOA using TFQ"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "MDDFanHIbDfS",
+        "colab_type": "text"
+      },
+      "source": [
+        "First we must install the required libraries"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "rFqxhKypZoSJ",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "!pip install -q --upgrade tensorflow==2.1.0"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "xcDb1zbSdXKi",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "!pip install -q tensorflow-quantum"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "VWkUxydDbI_C",
+        "colab_type": "text"
+      },
+      "source": [
+        "Next, we import necessary modules"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "3kQL6cljZyJq",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "import tensorflow as tf\n",
+        "import tensorflow_quantum as tfq\n",
+        "import cirq\n",
+        "import sympy\n",
+        "import numpy as np\n",
+        "\n",
+        "# visualization tools\n",
+        "%matplotlib inline\n",
+        "import matplotlib.pyplot as plt\n",
+        "from cirq.contrib.svg import SVGCircuit\n",
+        "#supress warning for matplotlib\n",
+        "import warnings\n",
+        "warnings.filterwarnings(\"ignore\")"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "Xc4ZYqG1aXJu",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "import networkx as nx"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "IxaTUKjkbnaS",
+        "colab_type": "text"
+      },
+      "source": [
+        "We can use QAOA to solve Max-cut. First we need to generate a 3-regular graph with 10 nodes upon which to find the Max-cut using QAOA"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "1J6wZ6zfb0Bi",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "# generate a 3-regular graph with 10 nodes\n",
+        "maxcut_graph = nx.random_regular_graph(n=10,d=3)"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "fM3quBeNcDF5",
+        "colab_type": "text"
+      },
+      "source": [
+        "Let's visualize the graph"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "3GLOTJj6cFqC",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "fig, ax = plt.subplots(1, 1, figsize=(8, 6));\n",
+        "nx.draw_networkx(maxcut_graph, ax=ax)"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "XaS5DlNqcJg6",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "cirq_qubits = cirq.GridQubit.rect(1, 10)"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "g1ihNnOncvFI",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "# create layer of hadamards to initialize the superposition state of all \n",
+        "# computational states\n",
+        "hadamard_circuit = cirq.Circuit()\n",
+        "for node in maxcut_graph.nodes():\n",
+        "    qubit = cirq_qubits[node]\n",
+        "    hadamard_circuit.append(cirq.H.on(qubit))"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "j5tOK2UBc0rP",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "# define the two parameters for one block of QAOA\n",
+        "qaoa_parameters = sympy.symbols('a b')"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "JGgm8N3_c9lu",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "# define the the mixing and the cost Hamiltonian, H_M and H_P\n",
+        "mixing_ham = 0\n",
+        "for node in maxcut_graph.nodes():\n",
+        "    qubit = cirq_qubits[node]\n",
+        "    mixing_ham += cirq.PauliString(cirq.X(qubit))\n",
+        "\n",
+        "cost_ham = maxcut_graph.number_of_edges()/2\n",
+        "for edge in maxcut_graph.edges():\n",
+        "    qubit1 = cirq_qubits[edge[0]]\n",
+        "    qubit2 = cirq_qubits[edge[1]]\n",
+        "    cost_ham += cirq.PauliString(1/2*(cirq.Z(qubit1)*cirq.Z(qubit2)))\n",
+        "\n",
+        "# generate the qaoa circuit\n",
+        "qaoa_circuit = tfq.util.exponential(operators = [cost_ham, mixing_ham], \n",
+        "                                    coefficients = qaoa_parameters)"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "lG52WM2wdPCW",
+        "colab_type": "text"
+      },
+      "source": [
+        "Subsequently, we use these ingredients to build our model. We note here in this case that QAOA has no input data and labels, as we have mapped our graph to the QAOA circuit. To use the TFQ framework we specify the Hadamard circuit as input and convert it to a TFQ tensor. We may then construct a tf.keras model using our QAOA circuit and cost in a TFQ PQC layer, and use a single instance sample for training the variational parameters of the QAOA with the Hadamard gates as an input layer and a target value of $0$ for our loss function. This translates into the following code:"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "MEJ0q4qUdIQ-",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "# define the model and training data\n",
+        "model_circuit, model_readout = qaoa_circuit, cost_ham\n",
+        "input_ = [hadamard_circuit]\n",
+        "input_ = tfq.convert_to_tensor(input_)\n",
+        "optimum = [0]"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "8dfq7vf4dYRd",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "# Build the Keras model.\n",
+        "optimum=np.array(optimum)\n",
+        "model = tf.keras.Sequential()\n",
+        "model.add(tf.keras.layers.Input(shape=(), dtype=tf.dtypes.string))\n",
+        "model.add(tfq.layers.PQC(model_circuit, model_readout))\n",
+        "tfq.layers.PQC"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "QtTxpOCRl1lE",
+        "colab_type": "text"
+      },
+      "source": [
+        "To optimize the parameters of the ansatz state, we use a classical optimization routine. In general, it would be possible to use pre-calculated parameters  or to implement for QAOA tailored optimization routines. For this tutorial, we choose the Adam optimizer implemented in tensorflow. We also choose the mean absolute error as our loss function."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "GJlUgMFpdhhr",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "model.compile(loss=tf.keras.losses.mean_absolute_error,\n",
+        "              optimizer=tf.keras.optimizers.Adam())\n",
+        "          \n",
+        "history = model.fit(input_,optimum,epochs=1000,verbose=1)"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "0CfbWtA6eQuH",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "plt.plot(history.history['loss'])\n",
+        "plt.title(\"QAOA with TFQ\")\n",
+        "plt.xlabel(\"Iteration\")\n",
+        "plt.ylabel(\"Loss\")\n",
+        "plt.show()"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "Aa9e74pvxXH8",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "# Read out the optimal paramters and sample from the final state 1000 times\n",
+        "params = model.trainable_variables\n",
+        "add = tfq.layers.AddCircuit()\n",
+        "output_circuit = add(input_, append =qaoa_circuit )\n",
+        "\n",
+        "sample_layer = tfq.layers.Sample()\n",
+        "output = sample_layer(output_circuit,  symbol_names=qaoa_parameters, symbol_values = params,repetitions=1000)"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "lVo2oeNC0fzs",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "# Translate output in cut sets\n",
+        "cuts_qaoa = []\n",
+        "for bit_string in output.values:\n",
+        "  temp = []\n",
+        "  for pos, bit in enumerate(bit_string):\n",
+        "    if bit==1:\n",
+        "      temp.append(pos)\n",
+        "  cuts_qaoa.append(temp)"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "93R1MoMe6guh",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "# Generate a list with all possible subsets\n",
+        "from itertools import combinations\n",
+        "sub_lists = []\n",
+        "for i in range(0, len(maxcut_graph.nodes())+1):\n",
+        "  temp = [list(x) for x in combinations(maxcut_graph.nodes(), i)]\n",
+        "  sub_lists.extend(temp)"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "9gOoGimx6z2v",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "# Calculate the cut_size for all possible cuts\n",
+        "cut_size = []\n",
+        "for sub_list in sub_lists:\n",
+        "  cut_size.append(nx.algorithms.cuts.cut_size(maxcut_graph,sub_list))\n",
+        "\n",
+        "# Calculate the cut_size for the cuts found with QAOA\n",
+        "cut_size_qaoa = []\n",
+        "for cut in cuts_qaoa:\n",
+        "  cut_size_qaoa.append(nx.algorithms.cuts.cut_size(maxcut_graph,cut))"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "nW1uZWrK63PH",
+        "colab_type": "code",
+        "colab": {}
+      },
+      "source": [
+        "# Calculate the approximation ratio\n",
+        "np.mean(cut_size_qaoa)/np.max(cut_size)"
+      ],
+      "execution_count": 0,
+      "outputs": []
+    }
+  ]
+}

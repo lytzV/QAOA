@@ -1,0 +1,34 @@
+import warnings
+warnings.filterwarnings('ignore')
+
+import matplotlib.pyplot as plt
+import numpy as np
+import nlopt
+import networkx as nx
+import qiskit
+from qiskit import BasicAer
+from qiskit.optimization.ising import max_cut
+from qiskit.aqua import QuantumInstance
+from qiskit.aqua.components.optimizers.nlopts.esch import ESCH
+from qiskit.aqua.algorithms import QAOA
+from qiskit.quantum_info import Pauli
+from qiskit.aqua.operators.weighted_pauli_operator import WeightedPauliOperator
+import pandas as pd
+
+from IPython.display import clear_output
+
+def update_progress(progress):
+    bar_length = 20
+    if isinstance(progress, int):
+        progress = float(progress)
+    if not isinstance(progress, float):
+        progress = 0
+    if progress < 0:
+        progress = 0
+    if progress >= 1:
+        progress = 1
+    block = int(round(bar_length * progress))
+    clear_output(wait = True)
+    text = "Progress: [{0}] {1:.1f}%".format( "#" * block + "-" * (bar_length - block), progress * 100)
+    print(text)
+
